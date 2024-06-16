@@ -12,7 +12,7 @@
     "knowledge",
     "api"
   ],
-  "img": "/modules/apiextender/images/module.svg",
+  "img": "https://raw.githubusercontent.com/osoobe/freescout-api-extender/main/Public/images/module.welp",
   "active": 0,
   "order": 0,
   "providers": [
