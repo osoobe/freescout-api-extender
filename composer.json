@@ -1,0 +1,24 @@
+{
+  "name": "freescout/apiextender",
+  "description": "",
+  "authors": [
+    {
+      "name": "jtorvald",
+      "email": ""
+    }
+  ],
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Modules\\ApiExtender\\Providers\\ApiExtenderServiceProvider"
+      ],
+      "aliases": {
+      }
+    }
+  },
+  "autoload": {
+    "psr-4": {
+      "Modules\\ApiExtender\\": ""
+    }
+  }
+}
