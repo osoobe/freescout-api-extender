@@ -14,13 +14,13 @@ use Modules\Reports\Http\Controllers\ReportsController;
 class ReportApiController extends ReportsController
 {
 
-    
 
-	/**
+
+    /**
      * Ajax controller.
      */
     public function publicReport(Request $request, $report_name)
-    {   
+    {
         $response = [
             'status' => 'error',
             'msg'    => '', // this is error message
@@ -44,6 +44,49 @@ class ReportApiController extends ReportsController
 
         return \Response::json($response);
     }
+
+    public function strtimeToMinutes($timeString)
+    {
+        $days = 0;
+        $hours = 0;
+        $minutes = 0;
+
+        // Split the string by spaces to separate each part
+        $parts = explode(' ', $timeString);
+
+        // Iterate over the parts to extract days, hours, and minutes
+        for ($i = 0; $i < count($parts); $i += 2) {
+            $value = intval($parts[$i]);
+            $unit = $parts[$i + 1];
+
+            if (strpos($unit, 'd') !== false) {
+                $days = $value;
+            } elseif (strpos($unit, 'h') !== false) {
+                $hours = $value;
+            } elseif (strpos($unit, 'min') !== false) {
+                $minutes = $value;
+            }
+        }
+
+        // Calculate the total minutes
+        $totalMinutes = ($days * 24 * 60) + ($hours * 60) + $minutes;
+
+        return $totalMinutes;
+    }
+
+    public function buildTimeTable($table, $meta_name, $metas, $metas_prev, $user_id = false)
+    {
+        $table = parent::buildTimeTable($table, $meta_name, $metas, $metas_prev, $user_id);
+        // Add average.
+        try {
+            $table[-2] = $this->strtimeToMinutes($table[-1]);
+        } catch (\Throwable $th) {
+            $table[-2] = 60;
+        }
+        return $table;
+    }
+
+
 
     
 
@@ -71,6 +114,14 @@ class ReportApiController extends ReportsController
                 }
             }
         }
+        
+        /** @var \Illuminate\Database\Eloquent\Builder $query */
+        if (
+            !empty($request->filters['user']) && 
+            'threads' === $query->getModel()->getTable()
+        ) {
+            $query->where('threads.created_by_user_id', $request->filters['user']);
+        }
 
         if (!empty($from)) {
             $query->where($date_field, '>=', date('Y-m-d 00:00:00', strtotime($from)));
@@ -83,6 +134,11 @@ class ReportApiController extends ReportsController
         }
         if (!empty($request->filters['mailbox'])) {
             $query->where('conversations.mailbox_id', $request->filters['mailbox']);
+        } elseif (!$user->isAdmin()) {
+            $mailbox_ids = $user->mailboxesCanView(true)->pluck('id');
+            if (count($mailbox_ids)) {
+                $query->whereIn('conversations.mailbox_id', $mailbox_ids);
+            }
         }
         if (!empty($request->filters['tag']) && \Module::isActive('tags')) {
             if (!strstr($query->toSql(), 'conversation_tag')) {
@@ -117,5 +173,4 @@ class ReportApiController extends ReportsController
             }
         }
     }
-
 }
