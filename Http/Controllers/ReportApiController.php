@@ -26,9 +26,27 @@ class ReportApiController extends ReportsController
             'msg'    => '', // this is error message
         ];
 
-        switch ($report_name) {
+        switch (strtolower($report_name)) {
+            case \Reports::REPORT_CONVERSATIONS:
+                $data = $this->getReportDataConversations($request);
+                $response['data'] = $data;
+                $response['status'] = 'success';
+                break;
+
             case \Reports::REPORT_PRODUCTIVITY:
                 $data = $this->getReportDataProductivity($request);
+                $response['data'] = $data;
+                $response['status'] = 'success';
+                break;
+                        
+            case \Reports::REPORT_SATISFACTION:
+                $data = $this->getReportSatisfaction($request);
+                $response['data'] = $data;
+                $response['status'] = 'success';
+                break;
+
+            case \Reports::REPORT_TIME:
+                $data = $this->getReportTime($request);
                 $response['data'] = $data;
                 $response['status'] = 'success';
                 break;
@@ -43,6 +61,15 @@ class ReportApiController extends ReportsController
         }
 
         return \Response::json($response);
+    }
+
+    
+
+    public function getReportTime($request)
+    {
+        $data = parent::getReportTime($request);
+        
+        return $data;
     }
 
     public function strtimeToMinutes($timeString)
@@ -95,7 +122,7 @@ class ReportApiController extends ReportsController
         $from = $request->filters['from'];
         $to = $request->filters['to'];
 
-        $user = auth()->user();
+        $user = User::find($request->filters['auth_user'] ?? 1);
 
         if (!$date_field_to) {
             $date_field_to = $date_field;
@@ -115,12 +142,36 @@ class ReportApiController extends ReportsController
             }
         }
         
+        $query_table_name = $query->getModel()->getTable();
+        switch ($query_table_name) {
+            case 'threads':
+                $query_table_user_id_field = 'threads.created_by_user_id';
+                break;
+            
+            default:
+                $query_table_user_id_field = '';
+                break;
+        }
+
         /** @var \Illuminate\Database\Eloquent\Builder $query */
         if (
             !empty($request->filters['user']) && 
-            'threads' === $query->getModel()->getTable()
+            'threads' === $query_table_name
         ) {
             $query->where('threads.created_by_user_id', $request->filters['user']);
+        }
+
+        if ( isset($request->filters['include_bot']) && ! (bool) $request->filters['include_bot']) {
+            
+            if ( !empty(env('FREESCOUT_BOT_USER')) ) {
+                $exclude_bots = array_filter( explode( ',', env('FREESCOUT_BOT_USERS') ) );
+            } else {
+                $exclude_bots = [4,5];
+            }
+
+            if ( !empty($query_table_user_id_field) && count( $exclude_bots ) ) {
+                $query->whereNotIn( $query_table_user_id_field, $exclude_bots );
+            }
         }
 
         if (!empty($from)) {
