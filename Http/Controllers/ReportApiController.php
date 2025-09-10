@@ -166,7 +166,7 @@ class ReportApiController extends ReportsController
             if ( !empty(env('FREESCOUT_BOT_USER')) ) {
                 $exclude_bots = array_filter( explode( ',', env('FREESCOUT_BOT_USERS') ) );
             } else {
-                $exclude_bots = [4,5];
+                $exclude_bots = [4,5,31];
             }
 
             if ( !empty($query_table_user_id_field) && count( $exclude_bots ) ) {
