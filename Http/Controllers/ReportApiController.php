@@ -35,6 +35,22 @@ class ReportApiController extends ReportsController
 
             case \Reports::REPORT_PRODUCTIVITY:
                 $data = $this->getReportDataProductivity($request);
+
+                // Total Conversations.
+                $value = $this->countTotalConv($request);
+                $data['metrics']['total_conversations']['value'] = $value;
+                $data['metrics']['total_conversations']['change'] = $this->calcChange($value, $this->countTotalConv($request, true));
+
+                // New Conversations.
+                $value = $this->countNewConv($request);
+                $data['metrics']['new_conversations']['value'] = $value;
+                $data['metrics']['new_conversations']['change'] = $this->calcChange($value, $this->countNewConv($request, true));
+
+                // Customers.
+                $value = $this->countCustomers($request);
+                $data['metrics']['total_customers']['value'] = $value;
+                $data['metrics']['total_customers']['change'] = $this->calcChange($value, $this->countCustomers($request, true));
+
                 $response['data'] = $data;
                 $response['status'] = 'success';
                 break;
