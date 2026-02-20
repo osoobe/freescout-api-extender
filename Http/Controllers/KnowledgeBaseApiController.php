@@ -54,6 +54,52 @@ class KnowledgeBaseApiController extends Controller
 
     }
 
+    public function search(Request $request, $mailboxId)
+    {
+        $q = trim($request->q ?? '');
+
+        $mailbox = Mailbox::findOrFail($mailboxId);
+        $locale = $request->input('locale') ?? \Kb::defaultLocale($mailbox);
+
+        if ($mailbox === null) {
+            return Response::json([], 404);
+        }
+
+        $articles = \KbArticle::where('mailbox_id', $mailbox->id)
+            ->where('status', \KbArticle::STATUS_PUBLISHED)
+            ->whereRaw(
+                "MATCH(title, text) AGAINST (? IN NATURAL LANGUAGE MODE)",
+                [$q]
+            )
+            ->orderByRaw(
+                "MATCH(title, text) AGAINST (? IN NATURAL LANGUAGE MODE) DESC",
+                [$q]
+            )
+            ->get();
+
+        $items = [];
+        foreach ($articles as $i => $article) {
+            // Not visible for current visitor.
+            if (!$article->isVisible()) {
+                unset($articles[$i]);
+            }
+
+            $items[] = (object)[
+                'id' => $article->id,
+                'title' => $article->title,
+                'text' => $article->text,
+                'slug' => $article->slug,
+            ];
+        }
+
+        return Response::json([
+            'mailbox_id' => $mailbox->id,
+            'name' => $mailbox->name,
+            'articles' => $items,
+        ], 200);
+
+    }
+
     public function category(Request $request, $mailboxId, $categoryId)
     {
         $mailbox = Mailbox::findOrFail($mailboxId);
@@ -118,7 +164,7 @@ class KnowledgeBaseApiController extends Controller
 
         return $mailbox;
     }
-    
+
 
     /**
      * Frontend article.
@@ -137,7 +183,7 @@ class KnowledgeBaseApiController extends Controller
         $related_articles = [];
 
         $article = KbArticle::findOrFail($request->article_id);
-        
+
 
         if (!$article->isPublished()) {
             $article = null;
@@ -179,7 +225,7 @@ class KnowledgeBaseApiController extends Controller
         //     }
         // }
 
-        
+
         return Response::json([
             'id' => $article->id,
             'mailbox_id' => $mailbox->id,
