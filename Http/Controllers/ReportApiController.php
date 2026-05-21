@@ -29,6 +29,12 @@ class ReportApiController extends ReportsController
         switch (strtolower($report_name)) {
             case \Reports::REPORT_CONVERSATIONS:
                 $data = $this->getReportDataConversations($request);
+                
+                $data['table_fields'] = [];
+                // if (\Module::isActive('tags')) {
+                $data['table_fields'] = $this->tableSubjectField($request);
+                // }
+                
                 $response['data'] = $data;
                 $response['status'] = 'success';
                 break;
@@ -239,5 +245,70 @@ class ReportApiController extends ReportsController
                 }
             }
         }
+    }
+
+    
+    public function tableSubjectField($request)
+    {
+        $custom_field_ids = [9,3];
+
+        // Ideally created_at field is need in conversation_tag.
+        $query = Conversation::where('conversations.state', Conversation::STATE_PUBLISHED)
+            ->where('conversations.status', '!=', Conversation::STATUS_SPAM)
+            ->when(!empty($custom_field_ids), function($q) use($custom_field_ids) {
+                $q->whereIn('conversation_custom_field.custom_field_id', $custom_field_ids);
+            })
+            ->leftJoin('conversation_custom_field', function ($join) {
+                $join->on('conversations.id', '=', 'conversation_custom_field.conversation_id');
+            })
+            ->groupBy('conversation_custom_field.custom_field_id', 'conversation_custom_field.value');
+
+        $this->applyFilter($query, $request, false);
+
+        $stats = $query->get(array(
+            \DB::raw('conversation_custom_field.custom_field_id'),
+            \DB::raw('conversation_custom_field.value'),
+            \DB::raw('COUNT(*) as conv_count')
+        ));
+        // if (\Helper::isMySql()) {
+        //     $stats = $query->get(array(
+        //         \DB::raw('conversation_tag.tag_id'),
+        //         \DB::raw('COUNT(*) as conv_count')
+        //     ));
+        // } else {
+        //     $stats = $query->get(array(
+        //         \DB::raw('conversation_tag.tag_id'),
+        //         \DB::raw('COUNT(*) conv_count')
+        //     ));
+        // }
+
+        $table_tags = $stats->sortBy('messages_count')->reverse()->toArray();
+
+        $table_tags = array_slice($table_tags, 0, \Reports::MAX_TABLE_ITEMS);
+
+        $tag_ids = array_pluck($table_tags, 'value');
+
+        // $tags = \Modules\Tags\Entities\Tag::whereIn('id', $tag_ids)->get();
+        $customFields = \Modules\CustomFields\Entities\CustomField::whereIn(
+            'id',
+            $custom_field_ids
+        )->get();
+        // return $table_tags;
+        // return $customFields->toArray();
+        // $tags = $customFields->options;
+
+        foreach ($table_tags as $i => $table_tag) {
+            $customField = $customFields->where('id', $table_tag['custom_field_id'])->first();
+            $tags = $customField->options;
+            foreach ($tags as $key => $tag) {
+                $table_tags[$i]['field'] = $customField->name;
+                if ($key == (string) $table_tag['value']) {
+                    $table_tags[$i]['value_name'] = $tag;
+                    continue 2;
+                }
+            }
+        }
+
+        return $table_tags;
     }
 }
